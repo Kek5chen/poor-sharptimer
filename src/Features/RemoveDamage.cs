@@ -13,6 +13,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+using System.Reflection;
 using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
@@ -26,6 +27,7 @@ namespace SharpTimer
     {
         private readonly SharpTimer Plugin;
         private readonly Utils Utils;
+        private object? LinuxDamageHook;
 
         public RemoveDamage(SharpTimer plugin)
         {
@@ -42,7 +44,15 @@ namespace SharpTimer
                 if (Plugin.isLinux)
                 {
                     Utils.LogDebug("Trying to register Linux Damage hook...");
-                    VirtualFunctions.CBaseEntity_TakeDamageOldFunc.Hook(OnTakeDamage, HookMode.Pre);
+                    FieldInfo? field = typeof(VirtualFunctions).GetField("CBaseEntity_TakeDamageOldFunc", BindingFlags.Public | BindingFlags.Static);
+                    if (field == null)
+                    {
+                        Utils.LogError("Error in DamageHook: CBaseEntity_TakeDamageOldFunc is unavailable in this CounterStrikeSharp build");
+                        return;
+                    }
+
+                    LinuxDamageHook = field.GetValue(null);
+                    InvokeLinuxDamageHook("Hook");
                 }
                 else
                 {
@@ -67,7 +77,11 @@ namespace SharpTimer
             {
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
                 {
-                    VirtualFunctions.CBaseEntity_TakeDamageOldFunc.Unhook(OnTakeDamage, HookMode.Pre);
+                    if (LinuxDamageHook != null)
+                    {
+                        InvokeLinuxDamageHook("Unhook");
+                        LinuxDamageHook = null;
+                    }
                 }
                 else
                 {
@@ -81,6 +95,18 @@ namespace SharpTimer
                 else
                     Utils.LogError($"Error in DamageUnHook: {ex.Message}");
             }
+        }
+
+        private void InvokeLinuxDamageHook(string methodName)
+        {
+            if (LinuxDamageHook == null)
+                throw new InvalidOperationException("Linux damage hook handle was not initialized");
+
+            MethodInfo? hookMethod = LinuxDamageHook.GetType().GetMethod(methodName, [typeof(Func<DynamicHook, HookResult>), typeof(HookMode)]);
+            if (hookMethod == null)
+                throw new MissingMethodException($"Could not resolve {methodName} on Linux damage hook handle");
+
+            hookMethod.Invoke(LinuxDamageHook, [(Func<DynamicHook, HookResult>)OnTakeDamage, HookMode.Pre]);
         }
 
         private HookResult OnTakeDamage(DynamicHook hook)

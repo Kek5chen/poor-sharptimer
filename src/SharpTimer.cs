@@ -64,7 +64,19 @@ public partial class SharpTimer : BasePlugin
         movementPtr = isLinux ? 1 : 2;
         RunCommand = isLinux ? new RunCommandLinux() : new RunCommandWindows();
 
-        if (isLinux) RunCommand?.Hook(OnRunCommand, HookMode.Pre);
+        if (isLinux)
+        {
+            try
+            {
+                RunCommand?.Hook(OnRunCommand, HookMode.Pre);
+                runCommandHookInstalled = true;
+            }
+            catch (Exception ex)
+            {
+                runCommandHookInstalled = false;
+                Utils.LogError($"Error in RunCommand hook: {ex.Message}; continuing without movement-style input enforcement.");
+            }
+        }
         StateTransition.Hook(Hook_StateTransition, HookMode.Post);
         RemoveDamage?.Hook();
 
@@ -95,7 +107,21 @@ public partial class SharpTimer : BasePlugin
 
     public override void Unload(bool hotReload)
     {
-        if (isLinux) RunCommand?.Unhook(OnRunCommand, HookMode.Pre);
+        if (isLinux && runCommandHookInstalled)
+        {
+            try
+            {
+                RunCommand?.Unhook(OnRunCommand, HookMode.Pre);
+            }
+            catch (Exception ex)
+            {
+                Utils.LogError($"Error in RunCommand unhook: {ex.Message}");
+            }
+            finally
+            {
+                runCommandHookInstalled = false;
+            }
+        }
         StateTransition.Unhook(Hook_StateTransition, HookMode.Post);
         RemoveDamage?.Unhook();
 
