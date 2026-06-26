@@ -390,7 +390,7 @@ namespace SharpTimer
 
         private bool IsHumanConnectedPlayer(CCSPlayerController? player)
         {
-            return player != null && player.IsValid && !player.IsBot && !player.IsHLTV && player.Connected == PlayerConnectedState.PlayerConnected;
+            return player != null && player.IsValid && !player.IsBot && !player.IsHLTV && player.Connected == PlayerConnectedState.Connected;
         }
 
         private bool TryBuildLivePlayerState(CCSPlayerController player, int stageCount, bool staged, out LivePlayerState playerState)

@@ -45,8 +45,31 @@ namespace SharpTimer
 
     public class RecordCache
     {
-        public Dictionary<int, PlayerRecord>? CachedWorldRecords { get; set; }
-        public List<PlayerPoints>? CachedGlobalPoints { get; set; }
+        public Dictionary<int, GlobalRecord>? CachedStandardWorldRecords { get; set; } = new();
+        public Dictionary<int, GlobalRecord>? Cached85tWorldRecords { get; set; } = new();
+        public Dictionary<int, GlobalRecord>? Cached102tWorldRecords { get; set; } = new();
+        public Dictionary<int, GlobalRecord>? Cached128tWorldRecords { get; set; } = new();
+        public Dictionary<int, GlobalRecord>? CachedSourceWorldRecords { get; set; } = new();
+        public Dictionary<int, GlobalRecord>? CachedBhopWorldRecords { get; set; } = new();
+        public List<PlayerPoints>? CachedGlobalPoints { get; set; } = new();
+    }
+
+    public class PlayerCache
+    {
+        public Dictionary<int, int> PlayerID { get; set; } = new();
+    }
+
+    public class ServerCache
+    {
+        public int ServerID { get; set; }
+    }
+
+    public class MapCache
+    {
+        public int MapID { get; set; }
+        public long AddonID { get; set; }
+        public string MapName { get; set; } = string.Empty;
+        public bool Verified { get; set; }
     }
 
     // MapData JSON
@@ -125,13 +148,8 @@ namespace SharpTimer
         public CurrentZoneInfo CurrentZoneInfo { get; set; } = new();
         public int currentStyle { get; set; }
         public bool changedStyle { get; set; }
-
-        public CurrentMode Mode { get; set; }
-        public enum CurrentMode
-        {
-            Classic,
-            Arcade
-        }
+        public int StartZoneJumps { get; set; }
+        public bool WasOnGroundLastTick { get; set; }
 
         //replay
         public bool IsReplaying { get; set; }
@@ -169,6 +187,9 @@ namespace SharpTimer
         public bool HideKeys { get; set; }
         public bool HidePlayers { get; set; }
         public bool HideWeapon { get; set; }
+        public bool HideChatSpeed { get; set; }
+        public string Mode { get; set; } = "Standard";
+        public bool ChangedMode { get; set; }
         public bool GivenWeapon { get; set; }
         public bool SoundsEnabled { get; set; }
         public bool BindsDisabled { get; set; }
@@ -275,6 +296,7 @@ namespace SharpTimer
         [JsonIgnore]
         public ReplayFrames? CurrentReplayFrame { get; set; }
         public List<ReplayFrames> replayFrames { get; set; } = [];
+        [Serializable]
         public class ReplayFrames
         {
             public int SampleIndex { get; set; }
@@ -291,7 +313,8 @@ namespace SharpTimer
             public bool TeleportCut { get; set; }
         }
     }
-
+    
+    [Serializable]
     public class IndexedReplayFrames
     {
         public int Index { get; set; }
@@ -365,6 +388,22 @@ namespace SharpTimer
         public string? MapName { get; set; }
         public int TimerTicks { get; set; }
         public bool Replay { get; set; }
+        public int Completions { get; set; }
+    }
+    
+    public class GlobalRecord
+    {
+        public int record_id { get; set; }
+        public int player_id { get; set; }
+        public string player_name { get; set; } = string.Empty;
+        public int server_id { get; set; }
+        public int map_id { get; set; }
+        public int bonus { get; set; }
+        public string mode { get; set; } = string.Empty;
+        public string style { get; set; } = string.Empty;
+        public decimal time { get; set; }
+        public DateTimeOffset created_on { get; set; }
+        public bool replay { get; set; }
     }
 
     public class Record
@@ -389,8 +428,9 @@ namespace SharpTimer
     public class ReplayData
     {
         public int record_id { get; set; }
-        public string? map_name { get; set; }
-        public int style { get; set; }
+        public int map_id { get; set; }
+        public int bonus { get; set; }
+        public string mode { get; set; } = string.Empty;
         public string? hash { get; set; }
         public string? replay_data { get; set; }
     }
@@ -398,8 +438,10 @@ namespace SharpTimer
     // PlayerPoints for MySql
     public class PlayerPoints
     {
+        public string SteamID { get; set; } = string.Empty;
         public string? PlayerName { get; set; }
         public int GlobalPoints { get; set; }
+        public int Placement { get; set; }
     }
 
     // Checkpoints

@@ -13,23 +13,26 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
-using CounterStrikeSharp.API.Modules.Memory;
 
 namespace SharpTimer
 {
     public partial class SharpTimer
     {
-        private HookResult OnPlayerTakeDamagePre(CCSPlayerPawn player, CTakeDamageInfo info)
+        private CCSGameRules? _gameRules;
+
+        private void UpdateGameRestartFlag()
         {
-            if (!disableDamage)
-                return HookResult.Continue;
-
-            if (player == null || !player.IsValid)
-                return HookResult.Continue;
-
-            info.Damage = 0;
-            return HookResult.Handled;
+            if (_gameRules == null)
+            {
+                var gameRulesProxy = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault();
+                _gameRules = gameRulesProxy?.GameRules;
+            }
+            else
+            {
+                _gameRules.GameRestart = _gameRules.RestartRoundTime < Server.CurrentTime;
+            }
         }
     }
 }

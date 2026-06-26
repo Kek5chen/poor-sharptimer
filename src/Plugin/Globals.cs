@@ -28,14 +28,12 @@ namespace SharpTimer
     public partial class SharpTimer
     {
         public override string ModuleName => "SharpTimer";
-        public override string ModuleVersion => $"0.3.1x";
-        public override string ModuleAuthor => "dea + sharptimer team & community";
-        public override string ModuleDescription => "A CS2 Timer Plugin";
+        public override string ModuleVersion => $"0.4.0";
+        public override string ModuleAuthor => "SharpTimer community";
 
         public static SharpTimer Instance = new();
 
         public Utils Utils = null!;
-        public RemoveDamage RemoveDamage = null!;
 
         public static PluginCapability<ISharpTimerEventSender> StEventSenderCapability { get; } = new("sharptimer:event_sender");
         public static PluginCapability<ISharpTimerManager> StManagerCapability { get; } = new("sharptimer:manager");
@@ -52,6 +50,8 @@ namespace SharpTimer
         private readonly CSPlayerState[] _oldPlayerState = new CSPlayerState[65];
         private HashSet<int> activeHidePlayersSlots = [];
 
+        public const int REPLAY_VERSION = 1;
+
         public Dictionary<int, PlayerTimerInfo> playerTimers = [];
         private Dictionary<int, PlayerReplays> playerReplays = [];
         private Dictionary<int, List<PlayerCheckpoint>> playerCheckpoints = [];
@@ -59,7 +59,14 @@ namespace SharpTimer
         public Dictionary<int, CCSPlayerController> connectedAFKPlayers = [];
         private Dictionary<uint, CCSPlayerController> specTargets = [];
         private EntityCache entityCache = new();
-        public Dictionary<int, PlayerRecord>? SortedCachedRecords = [];
+        public Dictionary<int, PlayerRecord>? SortedCachedStandardRecords = [];
+        public Dictionary<int, PlayerRecord>? SortedCached85tRecords = [];
+        public Dictionary<int, PlayerRecord>? SortedCached102tRecords = [];
+        public Dictionary<int, PlayerRecord>? SortedCached128tRecords = [];
+        public Dictionary<int, PlayerRecord>? SortedCachedSourceRecords = [];
+        public Dictionary<int, PlayerRecord>? SortedCachedBhopRecords = [];
+        public Dictionary<int, PlayerRecord>? SortedCachedCustomRecords = [];
+
         public readonly HttpClient httpClient = new();
         public JsonSerializerOptions jsonSerializerOptions = new()
         {
@@ -142,6 +149,7 @@ namespace SharpTimer
         public bool enableStageSR = true;
         public bool ignoreJSON = false;
         public bool enableReplays = false;
+        public bool useBinaryReplays = true;
         public bool onlySRReplay = false;
         public bool enableSRreplayBot = false;
         public bool replayBotSpawnPending = false;
@@ -152,7 +160,13 @@ namespace SharpTimer
         public string replayBotName = "";
         public string replayBotVisualModel = "characters/models/ctm_fbi/ctm_fbi.vmdl";
         public int maxReplayFrames = 19200;
-        public string apiKey = "";
+        // Global API is intentionally disabled, apiKey is forced blank. Preserved for posterity.
+        public readonly string apiKey = "";
+
+        public static float customAirAccel = 150f;
+        public static float customAccel = 10f;
+        public static float customWishSpeed = 30f;
+        public static float customFriction = 5.2f;
 
         public bool globalRanksEnabled = false;
         public float? globalPointsMultiplier = 1.0f;
@@ -190,8 +204,10 @@ namespace SharpTimer
         public double group4 = 25;
         public double group5 = 50;
 
-
-        public bool globalChecksPassed = false;
+        public bool validKey = false;
+        public bool validHash = false;
+        public bool validPlugins = false;
+        public bool validCvars = false;
         public bool globalDisabled = false;
         public bool displayChatTags = true;
         public bool displayScoreboardTags = true;
@@ -223,6 +239,8 @@ namespace SharpTimer
         public bool enableStyles = true;
         public bool enableStylePoints = true;
 
+        public Mode defaultMode = Mode.Standard;
+
         public bool removeLegsEnabled = false;
         public bool removeCollisionEnabled = true;
         public bool disableDamage = true;
@@ -248,6 +266,7 @@ namespace SharpTimer
         public bool isRankHUDTimerRunning = false;
 
         public bool resetTriggerTeleportSpeedEnabled = false;
+        public bool startzoneSingleJumpEnabled = false;
         public bool maxStartingSpeedEnabled = true;
         public int maxStartingSpeed = 320;
         public int maxBonusStartingSpeed = 320;
@@ -265,6 +284,8 @@ namespace SharpTimer
         public bool afkWarning = true;
         public int afkSeconds = 60;
         public int globalCacheInterval = 120;
+        public int recordCacheInterval = 60;
+        
         public double lowgravPointModifier = 0.8;
         public double sidewaysPointModifier = 1.3;
         public double halfSidewaysPointModifier = 1.3;
@@ -277,6 +298,13 @@ namespace SharpTimer
         public double fastForwardPointModifier = 0.8;
         public double parachutePointModifier = 0.8;
         public double tasPointModifier = 0.0;
+
+        public double sourceModeModifier = 1.1;
+        public double standardModeModifier = 1;
+        public double _85tModeModifier = 0.9;
+        public double _102tModeModifier = 0.85;
+        public double _128tModeModifier = 0.8;
+        public double bhopModeModifier = 0.8;
 
         public bool execCustomMapCFG = false;
 
@@ -300,6 +328,9 @@ namespace SharpTimer
         public string? PlayerStatsTable = "PlayerStats";
         public string? playerRecordsPath;
         public string? currentMapName;
+        // Surf Club bridge: upstream v0.4.0 dropped this string field in favour of
+        // mapCache.AddonID (long); our live telemetry still reads currentAddonID, so
+        // we keep it and populate it from the resolved addon id in OnMapStart.
         public string? currentAddonID;
         public string? defaultServerHostname = ConVar.Find("hostname")?.StringValue;
 

@@ -1,18 +1,16 @@
 # SharpTimer
-SharpTimer is a "simple" Surf/Bhop/MG/Deathrun/etc. CS2 Timer plugin using CounterStrikeSharp<br>
+SharpTimer is a CS2 Timer plugin for Surf/Bhop/MG/Deathrun using CounterStrikeSharp<br>
 
 > [!NOTE]
-> The original creator of SharpTimer is dea_bb, who discontinued support for the project after version 0.2.6. This fork is now maintaned by the community, mainly [rcnoob](https://github.com/rcnoob).
+> The original creator of SharpTimer is dea_bb, who discontinued support for the project after version 0.2.6. This fork is now occassionaly maintaned by the community.
 
-[**Discord**](https://discord.com/invite/SmQXeyMcny)
+## **Join Our Discord For Support**
+
+<a href="https://discord.com/invite/SmQXeyMcny"><img src="https://discord.com/api/guilds/1196646791450472488/widget.png?style=banner2"></a>
 
 <div align="center">
   <img src="https://files.catbox.moe/qvawnf.png" alt="" style="margin: 0;">
 </div>
-<p align="center">
-	<br>
-	<a href="https://ko-fi.com/rcnoob"><img width="185" src="https://files.catbox.moe/rig9aq.svg" alt="Badge"></a>
-</p>
 
 ## Features
 <details> 
@@ -72,27 +70,26 @@ SharpTimer is a "simple" Surf/Bhop/MG/Deathrun/etc. CS2 Timer plugin using Count
    <img src="https://i.imgur.com/nyn76Q4.png">
 </details>
 
+<p align="right">(<a href="#readme-top"> back to top </a>)</p>
+
 ## Dependencies
 
 [**MetaMod**](https://cs2.poggu.me/metamod/installation/)
 
-[**CounterStrikeSharp** *(v281 and up)*](https://github.com/roflmuffin/CounterStrikeSharp/releases)
+[**CounterStrikeSharp** *(v369 and up)*](https://github.com/roflmuffin/CounterStrikeSharp/releases)
 
-[**SharpTimerModelSetter** *(optional but recommended for custom player models)*](https://github.com/johandrevwyk/STCustomModels)
+[**cs2-tags** *(required)*](https://github.com/CounterStrike2-Plugins-Archive/cs2-tags)
 
 [**MovementUnlocker** *(optional but recommended for surf and bhop servers)*](https://github.com/Source2ZE/MovementUnlocker)
 
 [**RampBugFix** *(optional but recommended for surf servers)*](https://github.com/Interesting-exe/CS2Fixes-RampbugFix/)
 
-[**Web panel** *(optional but recommended)*](https://github.com/Letaryat/sharptimer-web-panel)
+[**STFixes** *(optional but recommended)*](https://github.com/SharpTimer/STFixes-metamod)
 
-[**SharpTimer-WallLists** *(optional but recommended)*](https://github.com/M-archand/SharpTimer-WallLists)
 
-[**CS2-TeleportAnglesFix** *(optional but recommended)*](https://github.com/M-archand/CS2-TeleportAnglesFix)
+[**SharpTimer-WallLists** *(optional)*](https://github.com/SharpTimer/WallLists)
 
-[**STFixes** *(optional but recommended)*](https://github.com/rcnoob/STFixes)
-
-[**Flashing HUD Fix** *(optional but recommended)*](https://github.com/deabb/CS2FlashingHtmlHudFix)
+[**SharpTimer-Trails** *(optional)*](https://github.com/SharpTimer/Trails)
 
 
 ## Install
@@ -104,55 +101,14 @@ SharpTimer is a "simple" Surf/Bhop/MG/Deathrun/etc. CS2 Timer plugin using Count
 
 * :exclamation: It is recommended to have a custom server cfg with your desired settings (for example [SURF](https://github.com/rcnoob/cs-cfg/blob/main/surf.cfg) or [BHOP](https://github.com/rcnoob/cs-cfg/blob/main/bhop.cfg)),
 
-# [SharpTimer Wiki/Docs](https://github.com/Letaryat/poor-sharptimer/wiki)
-
-# TODO List
-- [x] HUD
-  - [x] Speedometer
-  - [x] Pre
-  - [x] Timer
-  - [x] Info
-    - [x] PB
-    - [x] Map Rank Icon
-    - [x] Map Rank (ie 1/100)
-    - [x] Map Tier
-    - [x] Map Type
-  - [x] Spectator HUD
-- [x] Zones
-  - [x] Hook common triggers by default
-  - [x] Manual Zones
-  - [x] Hook Bonus Zones Triggers (Surf) 
-- [x] Player PBs
-  - [x] Save to Json
-  - [x] Save to MySQL
-- [x] Ranks
-  - [x] Map !top
-  - [x] Map !topbonus
-  - [x] Global server ranks
-    - [x] !points
-    - [x] Global Point system
-- [ ] Surf Stages/Checkpoint support
-  - [x] Stage/Checkpoint PBs with u/s
-    - [x] Json Stage/Checkpoint PBs saving
-    - [ ] MySql Stage/Checkpoint PBs saving
-- [x] MySQL
-	- [x] Basic Player Records
-  - [x] Player Server Stats
-  - [x] Player Map Stats
-- [x] Replays
-- [ ] Silly Stuff
-  - [x] Color customization
-  - [x] Special Tester Gifs
-  - [x] Custom Player Gifs
-  - [x] Dioscord Webhook
-  - [ ] Strafe Sync Bar on HUD
 
 
 ## Authors:
-original creator: [DEA_BB](https://twitter.com/dea_bb)
+Original creator: [DEA](https://github.com/girlglock)
 
-sharptimer team:
-[Letaryat](https://github.com/Letaryat)
+Current maintainer:
+[Marchand](https://github.com/M-archand)
+
+Previous maintainers:
 [rcnoob](https://github.com/rcnoob)
 [exkludera](https://github.com/exkludera)
-[Marchand](https://github.com/M-archand)

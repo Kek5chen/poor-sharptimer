@@ -30,6 +30,8 @@ namespace SharpTimer
                 int currentTick = Server.TickCount;
                 ReplayVisualEntityOnTick();
 
+                UpdateGameRestartFlag();
+
                 foreach (CCSPlayerController player in connectedPlayers.Values)
                 {
                     if (player == null || !player.IsValid) continue;
@@ -119,11 +121,32 @@ namespace SharpTimer
                         /* timer counting */
 
                         // remove jumping in startzone
-                        if (!startzoneJumping && playerTimers[player.Slot].inStartzone)
+                        if (!startzoneJumping && playerTimer.inStartzone)
                         {
-                            if((playerButtons & PlayerButtons.Jump) != 0)
+                            if((playerButtons & PlayerButtons.Jump) != 0 || playerTimer.MovementService!.LegacyJump.OldJumpPressed)
                                 playerPawn.AbsVelocity.Z = 0f;
                         }
+
+                        /* single startzone jump */
+                        if (startzoneSingleJumpEnabled && !playerTimer.IsTimerBlocked)
+                        {
+                            bool wasOnGround = playerTimer.WasOnGroundLastTick;
+                            playerTimer.WasOnGroundLastTick = playerPawn.GroundEntity.IsValid;
+                            
+                            if ((playerTimer.inStartzone || playerTimer.CurrentZoneInfo.InBonusStartZone) && playerTimer.StartZoneJumps >= 1 &&
+                                playerPawn.AbsVelocity.IsZero())
+                                playerTimer.StartZoneJumps = 0;
+
+                            if ((playerTimer.inStartzone || playerTimer.CurrentZoneInfo.InBonusStartZone) && !wasOnGround && playerPawn.GroundEntity.IsValid)
+                                playerTimer.StartZoneJumps++;
+
+                            if (playerTimer.StartZoneJumps == 1 && !wasOnGround)
+                            {
+                                playerPawn.AbsVelocity.X = 0;
+                                playerPawn.AbsVelocity.Y = 0;
+                            }
+                        }
+                        /* single startzone jump */
 
                         /* hide weapons */
                         bool hasWeapons = playerPawn.WeaponServices?.MyWeapons?.Count > 0;
@@ -166,10 +189,18 @@ namespace SharpTimer
 
                         if (playerTimer.changedStyle)
                         {
-                            _ = Task.Run(async () => await RankCommandHandler(player, steamID, slot, playerName, true, playerTimer.currentStyle));
+                            _ = Task.Run(async () => await RankCommandHandler(player, steamID, slot, playerName, true, playerTimer.currentStyle, playerTimer.Mode));
                             playerTimer.changedStyle = false;
                         }
                         /* styles */
+                        
+                        /* modes */
+                        if (playerTimer.ChangedMode)
+                        {
+                            _ = Task.Run(async () => await RankCommandHandler(player, steamID, slot, playerName, true, playerTimer.currentStyle, playerTimer.Mode));
+                            playerTimer.ChangedMode = false;
+                        }
+                        /* modes */
 
                         // respawn player if on bhop block too long
                         bool isOnBhopBlock = playerTimer.IsOnBhopBlock;
@@ -212,7 +243,7 @@ namespace SharpTimer
                         if (playerTimer.IsRankPbCached == false)
                         {
                             Utils.LogDebug($"{playerName} has rank and pb null... calling handler");
-                            _ = Task.Run(async () => await RankCommandHandler(player, steamID, slot, playerName, true, playerTimer.currentStyle));
+                            _ = Task.Run(async () => await RankCommandHandler(player, steamID, slot, playerName, true, playerTimer.currentStyle, playerTimer.Mode));
 
                             playerTimer.IsRankPbCached = true;
                         }
@@ -222,7 +253,7 @@ namespace SharpTimer
                         {
                             Utils.LogDebug($"{playerName} CachedMapPlacement is still null, calling rank handler once more");
                             playerTimer.IsRankPbReallyCached = true;
-                            AddTimer(3.0f, () => { _ = Task.Run(async () => await RankCommandHandler(player, steamID, slot, playerName, true, playerTimer.currentStyle)); });                           
+                            AddTimer(3.0f, () => { _ = Task.Run(async () => await RankCommandHandler(player, steamID, slot, playerName, true, playerTimer.currentStyle, playerTimer.Mode)); });                           
                         }
                         /* ranks */
 
@@ -289,6 +320,7 @@ namespace SharpTimer
                             player.PrintToCenterHtml(hudContent);
                         
                         // idk what this is for
+                        playerTimer.MovementService!.LegacyJump.OldJumpPressed = false;
                     }
                 }
             }
@@ -390,18 +422,20 @@ namespace SharpTimer
                                     $"{((playerButtons & PlayerButtons.Forward) != 0 ? "W" : "_")} " +
                                     $"{((playerButtons & PlayerButtons.Moveright) != 0 ? "D" : "_")} " +
                                     $"{((playerButtons & PlayerButtons.Back) != 0 ? "S" : "_")} " +
-                                    $"{((playerButtons & PlayerButtons.Jump) != 0 ? "J" : "_")} " +
+                                    $"{((playerButtons & PlayerButtons.Jump) != 0 || playerTimer.MovementService!.LegacyJump.OldJumpPressed ? "J" : "_")} " +
                                     $"{((playerButtons & PlayerButtons.Duck) != 0 ? "C" : "_")}";
 
 
-            string hudContent = (hudEnabled ? timerLine +
-                                (VelocityHudEnabled ? veloLine : "") +
-                                (StrafeHudEnabled && !playerTimer.IsReplaying ? syncLine : "") +
-                                infoLine : "") +
-                                (keyEnabled && !playerTimer.IsReplaying ? keysLineNoHtml : "") +
-                                ((playerTimer.IsTester && !playerTimer.IsReplaying) ? $"{(!keyEnabled ? "<br>" : "")}" + playerTimer.TesterBigGif : "") +
+            string hudContent = (hudEnabled
+                                    ? timerLine +
+                                      (VelocityHudEnabled ? veloLine : "") +
+                                      (StrafeHudEnabled && !playerTimer.IsReplaying ? syncLine : "") +
+                                      infoLine
+                                    : "") +
+                                (keyEnabled && !playerTimer.IsReplaying ? keysLineNoHtml : "");
+                                /*((playerTimer.IsTester && !playerTimer.IsReplaying) ? $"{(!keyEnabled ? "<br>" : "")}" + playerTimer.TesterBigGif : "") +
                                 ((playerTimer.IsVip && !playerTimer.IsTester && !playerTimer.IsReplaying) ? $"{(!keyEnabled ? "<br><br>" : "")}" + $"<br><img src='https://files.catbox.moe/{playerTimer.VipBigGif}.gif'><br>" : "") +
-                                ((playerTimer.IsReplaying && playerTimer.VipReplayGif != "x") ? playerTimer.VipReplayGif : "");
+                                ((playerTimer.IsReplaying && playerTimer.VipReplayGif != "x") ? playerTimer.VipReplayGif : "");*/
 
             return hudContent;
         }
@@ -412,15 +446,29 @@ namespace SharpTimer
                 ? $"<font class='fontSize-s stratum-bold-italic' color='gray'>" +
 
                     $"{playerTimer.CachedPB} " +
-                    $"({playerTimer.CachedMapPlacement})" +
+                    $"[{playerTimer.CachedMapPlacement}] " +
                     $"{(RankIconsEnabled ? $" |</font> <img src='{playerTimer.RankHUDIcon}'><font class='fontSize-s stratum-bold-italic' color='gray'>" : "")}" +
-                    $"{(enableStyles ? $" | {GetNamedStyle(playerTimer.currentStyle)}" : "")}" +
-                    $"{((MapTierHudEnabled && currentMapTier != null) ? $" | Tier: {currentMapTier}" : "")}" +
-                    $"{((MapTypeHudEnabled && currentMapType != null) ? $" | {currentMapType}" : "")}" +
-                    $"{((MapNameHudEnabled && currentMapType == null && currentMapTier == null) ? $" | {currentMapName}" : "")}" +
+                    $"{(enableStyles && playerTimer.currentStyle != 0 ? $" | {GetNamedStyle(playerTimer.currentStyle)}" : "")} | {playerTimer.Mode}<br>" +
+                    $"{GetMapDataLine()}" +
                     $"</font>"
 
                 : $" <font class='fontSize-s stratum-bold-italic' color='gray'>{playerTimer.ReplayHUDString}</font>";
+        }
+        
+        private string GetMapDataLine()
+        {
+            string mapInfo = "";
+    
+            if (MapTierHudEnabled && currentMapTier != null)
+                mapInfo += $"Tier: {currentMapTier}";
+    
+            if (MapTypeHudEnabled && currentMapType != null)
+                mapInfo += (string.IsNullOrEmpty(mapInfo) ? "" : " | ") + currentMapType;
+    
+            if (MapNameHudEnabled && currentMapType == null && currentMapTier == null)
+                mapInfo += (string.IsNullOrEmpty(mapInfo) ? "" : " | ") + currentMapName;
+    
+            return mapInfo;
         }
 
         private string GetBonusInfoLine(PlayerTimerInfo playerTimer)
@@ -436,7 +484,7 @@ namespace SharpTimer
                         $"{(cachedBonusInfo.Value != null ? $"{Utils.FormatTime(cachedBonusInfo.Value.PbTicks)}" : "Unranked")}" +
                         $"{(cachedBonusInfo.Value != null ? $" ({cachedBonusInfo.Value.Placement})" : "")}</font>" +
                         $"<font class='fontSize-s stratum-bold-italic' color='gray'>" +
-                        $"{(enableStyles ? $" | {GetNamedStyle(playerTimer.currentStyle)}" : "")}" +
+                        $"{(enableStyles && playerTimer.currentStyle != 0 ? $" | {GetNamedStyle(playerTimer.currentStyle)}" : "")} | {playerTimer.Mode}<br>" +
                         $" | Bonus #{currentBonusNumber} </font>"
                     : $" <font class='fontSize-s stratum-bold-italic' color='gray'>{playerTimer.ReplayHUDString}</font>";
             }
