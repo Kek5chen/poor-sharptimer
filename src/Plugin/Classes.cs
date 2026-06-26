@@ -114,7 +114,6 @@ namespace SharpTimer
         public int AFKTicks { get; set; }
         public bool AFKWarned { get; set; }
         public bool IsOnBhopBlock { get; set; }
-        public bool IsNoclip { get; set; }
         public bool IsTimerBlocked { get; set; }
         public int TimerTicks { get; set; }
         public List<int> PrevTimerTicks { get; set; } = new();

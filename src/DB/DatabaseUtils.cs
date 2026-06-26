@@ -937,6 +937,9 @@ namespace SharpTimer
 
         public async Task GetPlayerStats(CCSPlayerController? player, string steamId, string playerName, int slot, bool fromConnect)
         {
+            if (!enableDb)
+                return;
+
             Utils.LogDebug($"Trying to get player stats from database for {playerName}");
             try
             {
@@ -1173,10 +1176,16 @@ namespace SharpTimer
 
         public async Task SavePlayerStageTimeToDatabase(CCSPlayerController? player, int timerTicks, int stage, string velocity, string steamId, string playerName, int slot, int bonusX = 0, int style = 0)
         {
+            if (!enableDb)
+                return;
+
             Utils.LogDebug($"Trying to save player {(bonusX != 0 ? $"bonus {bonusX} stage {stage} time" : $"stage {stage} time")} to database for {playerName} {timerTicks}");
             try
             {
                 if (player == null || !IsAllowedPlayer(player))
+                    return;
+
+                if ((bonusX == 0 && !playerTimers[slot].IsTimerRunning) || (bonusX != 0 && !playerTimers[slot].IsBonusTimerRunning))
                     return;
 
                 if (timerTicks <= 0)
@@ -1394,6 +1403,9 @@ namespace SharpTimer
 
         public async Task SetPlayerStats(CCSPlayerController? player, string steamId, string playerName, int slot)
         {
+            if (!enableDb)
+                return;
+
             Utils.LogDebug($"Trying to set player stats in database for {playerName}");
             try
             {
@@ -2256,6 +2268,9 @@ namespace SharpTimer
         }
         public async Task<(string, string, string)> GetStageRecordSteamIDFromDatabase(int stage, int bonusX = 0, int top10 = 0)
         {
+            if (!enableDb)
+                return ("null", "null", "null");
+
             Utils.LogDebug($"Trying to get {(bonusX != 0 ? $"bonus {bonusX} stage {stage}" : $"stage {stage}")} record steamid from database");
             try
             {
@@ -2362,6 +2377,9 @@ namespace SharpTimer
 
         public async Task<(int, string)> GetStageRecordFromDatabase(int stage, string steamId, int bonusX = 0)
         {
+            if (!enableDb)
+                return (0, "null");
+
             Utils.LogDebug($"Trying to get {(bonusX != 0 ? $"bonus {bonusX} stage {stage}" : $"stage {stage}")} record steamid from database");
             try
             {
@@ -2446,6 +2464,9 @@ namespace SharpTimer
 
         public async Task<int> GetPreviousPlayerRecordFromDatabase(string steamId, string currentMapName, string playerName, int bonusX = 0, int style = 0)
         {
+            if (!enableDb)
+                return 0;
+
             Utils.LogDebug($"Trying to get Previous {(bonusX != 0 ? $"bonus {bonusX} time" : "time")} from database for {playerName}");
             try
             {
@@ -2505,6 +2526,9 @@ namespace SharpTimer
         }
         public async Task<int> GetPreviousPlayerStageRecordFromDatabase(CCSPlayerController? player, string steamId, string currentMapName, int stage, string playerName, int bonusX = 0)
         {
+            if (!enableDb)
+                return 0;
+
             Utils.LogDebug($"Trying to get Previous {(bonusX != 0 ? $"bonus {bonusX} stage {stage} time" : $"stage {stage} time")} from database for {playerName}");
             try
             {
@@ -2630,6 +2654,9 @@ namespace SharpTimer
 
         public async Task<Dictionary<int, PlayerRecord>> GetSortedRecordsFromDatabase(int limit = 0, int bonusX = 0, string mapName = "", int style = 0)
         {
+            if (!enableDb)
+                return [];
+
             Utils.LogDebug($"Trying GetSortedRecords {(bonusX != 0 ? $"bonus {bonusX}" : "")} from database");
             using (var connection = await OpenConnectionAsync())
             {
@@ -2831,6 +2858,9 @@ namespace SharpTimer
         }
         public async Task<Dictionary<string, PlayerRecord>> GetSortedStageRecordsFromDatabase(int stage, int limit = 0, int bonusX = 0, string mapName = "")
         {
+            if (!enableDb)
+                return [];
+
             Utils.LogDebug($"Trying GetSortedStageRecords {(bonusX != 0 ? $"bonus {bonusX}" : "")} from database");
             using (var connection = await OpenConnectionAsync())
             {
@@ -2930,6 +2960,9 @@ namespace SharpTimer
 
         public async Task<Dictionary<string, PlayerPoints>> GetSortedPointsFromDatabase()
         {
+            if (!enableDb)
+                return [];
+
             Utils.LogDebug("Trying GetSortedPoints from database");
             using (var connection = await OpenConnectionAsync())
             {

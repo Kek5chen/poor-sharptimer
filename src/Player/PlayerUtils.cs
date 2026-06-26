@@ -76,6 +76,8 @@ namespace SharpTimer
             }
 
             player.PrintToConsole($"{Localizer["console_hideweapon"]}");
+            player.PrintToConsole($"{Localizer["console_loss"]}");
+            player.PrintToConsole($"{Localizer["console_speedometer"]}");
             player.PrintToConsole($"{Localizer["console_spec"]}");
 
             if (enableStyles) player.PrintToConsole($"{Localizer["console_styles"]}");
@@ -335,23 +337,37 @@ namespace SharpTimer
 
                 string currentMapNamee = bonusX == 0 ? currentMapName! : $"{currentMapName}_bonus{bonusX}";
 
-                int savedPlayerTime = await GetPreviousPlayerRecordFromDatabase(steamId, currentMapName!, playerName, bonusX, style);
+                int savedPlayerTime = enableDb
+                    ? await GetPreviousPlayerRecordFromDatabase(steamId, currentMapName!, playerName, bonusX, style)
+                    : await GetPreviousPlayerRecord(steamId, bonusX);
 
                 if (savedPlayerTime == 0)
-                    return getRankImg ? UnrankedIcon : UnrankedTitle;
+                    return getRankImg ? UnrankedIcon : (getPlacementOnly ? "" : UnrankedTitle);
 
-                Dictionary<int, PlayerRecord> sortedRecords = await GetSortedRecordsFromDatabase(0, bonusX, currentMapNamee, style);
+                int totalPlayers;
+                int placement;
 
-                int placement = sortedRecords.Count(kv => kv.Value.TimerTicks < savedPlayerTime) + 1;
-                int totalPlayers = sortedRecords.Count;
-                double percentage = (double)placement / totalPlayers * 100;
+                if (enableDb)
+                {
+                    Dictionary<int, PlayerRecord> sortedRecords = await GetSortedRecordsFromDatabase(0, bonusX, currentMapNamee, style);
+                    totalPlayers = sortedRecords.Count;
+                    placement = sortedRecords.Count(kv => kv.Value.TimerTicks < savedPlayerTime) + 1;
+                }
+                else
+                {
+                    Dictionary<string, PlayerRecord> sortedRecords = await Utils.GetSortedRecords(bonusX, $"{currentMapNamee}.json");
+                    totalPlayers = sortedRecords.Count;
+                    placement = sortedRecords.Count(kv => kv.Value.TimerTicks < savedPlayerTime) + 1;
+                }
+
+                double percentage = totalPlayers == 0 ? 100 : (double)placement / totalPlayers * 100;
 
                 return CalculateRankStuff(totalPlayers, placement, percentage, getRankImg, getPlacementOnly);
             }
             catch (Exception ex)
             {
                 Utils.LogError($"Error in GetPlayerMapPlacementWithTotal: {ex}");
-                return UnrankedTitle;
+                return getPlacementOnly ? "" : UnrankedTitle;
             }
         }
         public async Task<double> GetPlayerMapPercentile(string steamId, string playerName, string mapname = "", int bonusX = 0, int style = 0, bool global = false, int timerTicks = 0)
@@ -367,30 +383,40 @@ namespace SharpTimer
                 int savedPlayerTime;
 
                 if (!global)
-                    savedPlayerTime = await GetPreviousPlayerRecordFromDatabase(steamId, currentMapNamee!, playerName, bonusX, style);
+                    savedPlayerTime = enableDb
+                        ? await GetPreviousPlayerRecordFromDatabase(steamId, currentMapNamee!, playerName, bonusX, style)
+                        : await GetPreviousPlayerRecord(steamId, bonusX);
                 else
                     savedPlayerTime = await GetPreviousPlayerRecordFromGlobal(steamId, currentMapNamee!, playerName, bonusX, style);
 
                 if (savedPlayerTime == 0)
                     savedPlayerTime = timerTicks;
 
-                Dictionary<int, PlayerRecord> sortedRecords;
-
-                if (!global)
-                    sortedRecords = await GetSortedRecordsFromDatabase(0, bonusX, currentMapNamee, style);
-                else
-                    sortedRecords = await GetSortedRecordsFromGlobal(0, bonusX, currentMapNamee, style);
-
                 int placement = 1;
-                int totalPlayers = sortedRecords.Count;
+                int totalPlayers;
 
-                if (totalPlayers > 0)
+                if (!global && !enableDb)
                 {
-                    placement = sortedRecords.Count(kv => kv.Value.TimerTicks < savedPlayerTime) + 1;
-
-                    if (placement > totalPlayers)
+                    Dictionary<string, PlayerRecord> sortedRecords = await Utils.GetSortedRecords(bonusX, $"{currentMapNamee}.json");
+                    totalPlayers = sortedRecords.Count;
+                    if (totalPlayers > 0)
                     {
-                        placement = totalPlayers;
+                        placement = sortedRecords.Count(kv => kv.Value.TimerTicks < savedPlayerTime) + 1;
+                        if (placement > totalPlayers)
+                            placement = totalPlayers;
+                    }
+                }
+                else
+                {
+                    Dictionary<int, PlayerRecord> sortedRecords = !global
+                        ? await GetSortedRecordsFromDatabase(0, bonusX, currentMapNamee, style)
+                        : await GetSortedRecordsFromGlobal(0, bonusX, currentMapNamee, style);
+                    totalPlayers = sortedRecords.Count;
+                    if (totalPlayers > 0)
+                    {
+                        placement = sortedRecords.Count(kv => kv.Value.TimerTicks < savedPlayerTime) + 1;
+                        if (placement > totalPlayers)
+                            placement = totalPlayers;
                     }
                 }
 
@@ -413,6 +439,9 @@ namespace SharpTimer
                 if (!IsPlayerOrSpectator(player))
                     return "";
 
+                if (!enableDb)
+                    return getRankImg ? UnrankedIcon : UnrankedTitle;
+
                 string currentMapNamee = bonusX == 0 ? currentMapName! : $"{currentMapName}_bonus{bonusX}";
 
                 int savedPlayerTime = await GetPreviousPlayerStageRecordFromDatabase(player, steamId, currentMapName!, stage, playerName, bonusX);
@@ -424,7 +453,7 @@ namespace SharpTimer
 
                 int placement = sortedRecords.Count(kv => kv.Value.TimerTicks < savedPlayerTime) + 1;
                 int totalPlayers = sortedRecords.Count;
-                double percentage = (double)placement / totalPlayers * 100;
+                double percentage = totalPlayers == 0 ? 100 : (double)placement / totalPlayers * 100;
 
                 return CalculateRankStuff(totalPlayers, placement, percentage, getRankImg, getPlacementOnly);
             }
@@ -472,12 +501,12 @@ namespace SharpTimer
                 foreach (var rank in rankDataList)
                 {
                     if (rank.Placement > 0 && placement == rank.Placement)
-                        return getRankImg ? rank.Icon : (getPlacementOnly ? $"{placement}/{totalPlayers}" : rank.Title);
+                        return getRankImg ? rank.Icon : (getPlacementOnly ? $"#{placement}" : rank.Title);
 
                     if (rank.Percent > 0 && percentage <= rank.Percent)
-                        return getRankImg ? rank.Icon : (getPlacementOnly ? $"{placement}/{totalPlayers}" : rank.Title);
+                        return getRankImg ? rank.Icon : (getPlacementOnly ? $"#{placement}" : rank.Title);
                 }
-                return getRankImg ? UnrankedIcon : (getPlacementOnly ? $"{placement}/{totalPlayers}" : UnrankedTitle);
+                return getRankImg ? UnrankedIcon : (getPlacementOnly ? $"#{placement}" : UnrankedTitle);
             }
             catch (Exception ex)
             {
@@ -614,7 +643,7 @@ namespace SharpTimer
 
             string ranking = await GetPlayerMapPlacementWithTotal(player, steamID, playerName, false, true, bonusX, style);
 
-            bool newSR = Utils.GetNumberBeforeSlash(ranking) == 1 && (oldticks > newticks || oldticks == 0);
+            bool newSR = ranking.TrimStart('#').Split('/')[0].Trim() == "1" && (oldticks > newticks || oldticks == 0);
             bool beatPB = oldticks > newticks;
             string newTime = Utils.FormatTime(newticks);
             string timeDifferenceNoCol = "";
@@ -685,7 +714,7 @@ namespace SharpTimer
 
             string ranking = await GetPlayerStagePlacementWithTotal(player, steamID, playerName, stage, false, true, bonusX);
 
-            bool newSR = Utils.GetNumberBeforeSlash(ranking) == 1 && (oldticks > newticks || oldticks == 0);
+            bool newSR = ranking.TrimStart('#').Split('/')[0].Trim() == "1" && (oldticks > newticks || oldticks == 0);
             bool beatPB = oldticks > newticks;
             string newTime = Utils.FormatTime(newticks);
             string timeDifferenceNoCol = "";
@@ -713,11 +742,11 @@ namespace SharpTimer
             });
         }
 
-        public void AddRankTagToPlayer(CCSPlayerController player, string rank)
+        public void AddRankTagToPlayer(CCSPlayerController player, string rank, string mapPlacement)
         {
             try
             {
-                if (string.IsNullOrEmpty(rank))
+                if (string.IsNullOrEmpty(rank) && string.IsNullOrEmpty(mapPlacement))
                     return;
 
                 if (TagApi == null)
@@ -730,30 +759,22 @@ namespace SharpTimer
                 }
 
                 string clanTag = $"{rank} {(playerTimers[player.Slot].IsVip ? $"{customVIPTag}" : "")}";
-
-                string rankColor = GetRankColorForChat(player);
-                string chatTag = $"{rankColor}{rank} ";
+                string chatTag = string.IsNullOrEmpty(mapPlacement) ? "" : $"{mapPlacement} ";
 
                 if (displayChatTags)
                 {
-                    TagApi.ResetAttribute(player, Tags.TagType.ChatTag);
-
-                    Server.NextFrame(() =>
-                    {
-                        string oldChatTag = TagApi.GetAttribute(player, Tags.TagType.ChatTag) ?? "";
-                        TagApi.SetAttribute(player, Tags.TagType.ChatTag, oldChatTag + chatTag);
-                    });
+                    if (string.IsNullOrEmpty(chatTag))
+                        TagApi.ResetAttribute(player, Tags.TagType.ChatTag);
+                    else
+                        Server.NextFrame(() => TagApi.SetAttribute(player, Tags.TagType.ChatTag, chatTag));
                 }
 
                 if (displayScoreboardTags)
                 {
-                    TagApi.ResetAttribute(player, Tags.TagType.ScoreTag);
-
-                    Server.NextFrame(() =>
-                    {
-                        string oldClanTag = TagApi.GetAttribute(player, Tags.TagType.ScoreTag) ?? "";
-                        TagApi.SetAttribute(player, Tags.TagType.ScoreTag, oldClanTag + clanTag);
-                    });
+                    if (string.IsNullOrEmpty(clanTag))
+                        TagApi.ResetAttribute(player, Tags.TagType.ScoreTag);
+                    else
+                        Server.NextFrame(() => TagApi.SetAttribute(player, Tags.TagType.ScoreTag, clanTag));
                 }
 
                 Utils.LogDebug($"Set Scoreboard Tag for {player.Clan} {player.PlayerName}");

@@ -26,12 +26,11 @@ namespace SharpTimer
             if (player == null)
                 return false;
 
-            if (playerTimers.TryGetValue(player.Slot, out var playTimer))
-            {
-                if (playTimer.IsNoclip)
-                    return false;
-            }
-
+            // Issue #2: noclip must NOT gate IsAllowedPlayer. The per-tick
+            // StopTimerForUtility already kills the run while noclipping, and the
+            // end/stage/checkpoint triggers all require IsTimerRunning, so a noclip
+            // run can never be saved anyway. Gating here only broke !r/!spec/!start/
+            // !end for an admin flying around in noclip ("spectating").
             bool isConnected = connectedPlayers.ContainsKey(player.Slot) && playerTimers.ContainsKey(player.Slot);
 
             bool isAlive = player.PawnIsAlive;
@@ -327,11 +326,12 @@ namespace SharpTimer
 
         public bool IsTimerBlocked(CCSPlayerController? player)
         {
-            if (!playerTimers[player!.Slot].IsTimerBlocked)
-            {
-                Utils.PrintToChat(player, Localizer["stop_using_timer"]);
+            if (player == null || !playerTimers.TryGetValue(player.Slot, out PlayerTimerInfo? playerTimer))
                 return true;
-            }
+
+            if (!playerTimer.IsTimerBlocked)
+                StopTimerForUtility(player, false, true);
+
             return false;
         }
 
@@ -351,9 +351,8 @@ namespace SharpTimer
             {
                 if (playerTimers[player.Slot].currentStyle == 12)
                     return true;
-                Utils.PrintToChat(player, Localizer["cant_use_checkpoint", (currentMapName!.Contains("surf_") ? "loc" : "checkpoint")]);
-                PlaySound(player, cpSoundError);
-                return false;
+
+                StopTimerForUtility(player, false, false);
             }
             return true;
         }

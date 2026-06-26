@@ -55,6 +55,12 @@ namespace SharpTimer
                             continue;
                         }
 
+                        if (player.IsPlayerNoclipping())
+                        {
+                            StopTimerForUtility(player, false, true);
+                            continue;
+                        }
+
                         if (!IsAllowedPlayer(player))
                         {
                             InvalidateTimer(player);

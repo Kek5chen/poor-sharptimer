@@ -416,7 +416,7 @@ namespace SharpTimer
         [CommandHelper(whoCanExecute: CommandUsage.CLIENT_ONLY)]
         public void SpecCommand(CCSPlayerController? player, CommandInfo command)
         {
-            if (!IsAllowedPlayer(player))
+            if (player == null || !player.IsValid || !connectedPlayers.ContainsKey(player.Slot))
                 return;
 
             if (player!.Team == CsTeam.Spectator)
@@ -804,7 +804,7 @@ namespace SharpTimer
                     playerTimers[slot].CachedRank = ranking;
                     playerTimers[slot].CachedMapPlacement = mapPlacement;
 
-                    if (displayScoreboardTags) AddRankTagToPlayer(player!, ranking);
+                    if (displayScoreboardTags || displayChatTags) AddRankTagToPlayer(player!, ranking, mapPlacement);
                 });
 
                 if (!sendRankToHUD)
@@ -1112,7 +1112,10 @@ namespace SharpTimer
         [CommandHelper(whoCanExecute: CommandUsage.CLIENT_ONLY)]
         public void RespawnPlayerCommand(CCSPlayerController? player, CommandInfo command)
         {
-            if (!IsAllowedPlayer(player) || respawnEnabled == false)
+            if (player == null || !player.IsValid || !connectedPlayers.ContainsKey(player.Slot) || !playerTimers.ContainsKey(player.Slot) || respawnEnabled == false)
+                return;
+
+            if (RejoinFromSpectator(player))
                 return;
 
             var slot = player!.Slot;
@@ -1165,34 +1168,23 @@ namespace SharpTimer
 
             var slot = player!.Slot;
             var playerName = player.PlayerName;
-            var pawn = player.Pawn.Value!;
 
             Utils.LogDebug($"{playerName} calling css_noclip...");
 
             if (CommandCooldown(player))
                 return;
 
-            if (IsTimerBlocked(player))
-                return;
+            bool isNoclipping = player.IsPlayerNoclipping();
 
-            playerTimers[slot].IsTimerRunning = false;
-            playerTimers[slot].TimerTicks = 0;
-            playerTimers[slot].IsBonusTimerRunning = false;
-            playerTimers[slot].BonusTimerTicks = 0;
+            StopTimerForUtility(player, false, true);
 
-            if (playerTimers[slot].IsNoclip)
+            if (isNoclipping)
             {
-                pawn.MoveType = MoveType_t.MOVETYPE_WALK;
-                Schema.SetSchemaValue(pawn.Handle, "CBaseEntity", "m_nActualMoveType", 2); // walk
-                Utilities.SetStateChanged(pawn, "CBaseEntity", "m_MoveType");
-                playerTimers[slot].IsNoclip = false;
+                SetMoveType(player, MoveType_t.MOVETYPE_WALK);
             }
             else
             {
-                pawn.MoveType = MoveType_t.MOVETYPE_NOCLIP;
-                Schema.SetSchemaValue(pawn.Handle, "CBaseEntity", "m_nActualMoveType", 8); // noclip
-                Utilities.SetStateChanged(pawn, "CBaseEntity", "m_MoveType");
-                playerTimers[slot].IsNoclip = true;
+                SetMoveType(player, MoveType_t.MOVETYPE_NOCLIP);
             }
         }
 
@@ -1431,6 +1423,9 @@ namespace SharpTimer
                     playerTimers[slot].IsBonusTimerRunning = false;
                     playerTimers[slot].BonusTimerTicks = 0;
                     playerTimers[slot].IsTimerBlocked = false;
+
+                    if (player.IsPlayerNoclipping())
+                        SetMoveType(player, MoveType_t.MOVETYPE_WALK);
                 });
 
                 PlaySound(player, respawnSound);
@@ -1492,8 +1487,6 @@ namespace SharpTimer
             }
         }
 
-        [ConsoleCommand("css_timer", "Stops your timer")]
-        [CommandHelper(whoCanExecute: CommandUsage.CLIENT_ONLY)]
         public void ForceStopTimer(CCSPlayerController? player, CommandInfo command)
         {
             if (!IsAllowedPlayer(player))
@@ -1666,9 +1659,6 @@ namespace SharpTimer
             if (ReplayCheck(player))
                 return;
 
-            if (IsTimerBlocked(player))
-                return;
-
             var name = command.GetArg(1);
             bool isPlayerFound = false;
             CCSPlayerController foundPlayer = null!;
@@ -1689,19 +1679,15 @@ namespace SharpTimer
                 return;
             }
 
-            if (!playerTimers[slot].IsTimerBlocked)
-                playerCheckpoints.Remove(slot);
-
-            playerTimers[slot].IsTimerRunning = false;
-            playerTimers[slot].TimerTicks = 0;
+            StopTimerForUtility(player, false, true);
 
             PlaySound(player, respawnSound);
 
-            if (foundPlayer != null && playerTimers[slot].IsTimerBlocked)
+            if (foundPlayer != null)
             {
                 Utils.PrintToChat(player, Localizer["goto_player", foundPlayer.PlayerName]);
 
-                if (player != null && IsAllowedPlayer(foundPlayer) && playerTimers[slot].IsTimerBlocked)
+                if (player != null && IsAllowedPlayer(foundPlayer))
                 {
                     player.PlayerPawn.Value!.Teleport(foundPlayer.Pawn.Value!.CBodyComponent?.SceneNode?.AbsOrigin.ToVector_t(),
                         foundPlayer.PlayerPawn.Value!.V_angle.ToQAngle_t(), new Vector_t(0, 0, 0));
