@@ -116,6 +116,7 @@ namespace SharpTimer
                 string style = GetNamedStyle(playerTimers[player!.Slot].currentStyle);
 
                 using var client = new HttpClient();
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("SharpTimer/1.0 (+https://cssurf.club)");
 
                 var fields = new List<object>();
 
@@ -228,9 +229,17 @@ namespace SharpTimer
                     { "title", !isSR ? $"set a new Personal Best!" : $"set a new Server Record!" },
                     { "fields", spacedFields.ToArray() },
                     { "author", new { name = $"{playerName}", url = $"https://steamcommunity.com/profiles/{steamID}" } },
-                    { "footer", new { text = discordWebhookFooter, icon_url = discordWebhookPFPUrl } },
                     { "image", new { url = mapImg } }
                 };
+
+                if (!string.IsNullOrWhiteSpace(discordWebhookFooter))
+                {
+                    embed.Add("footer", new
+                    {
+                        text = discordWebhookFooter,
+                        icon_url = string.IsNullOrWhiteSpace(discordWebhookPFPUrl) ? null : discordWebhookPFPUrl
+                    });
+                }
 
                 if (discordWebhookColor != 0)
                     embed.Add("color", discordWebhookColor);
@@ -243,7 +252,7 @@ namespace SharpTimer
                     content = (string?)null,
                     embeds = new[] { embed },
                     username = discordWebhookBotName,
-                    avatar_url = discordWebhookPFPUrl,
+                    avatar_url = string.IsNullOrWhiteSpace(discordWebhookPFPUrl) ? null : discordWebhookPFPUrl,
                     attachments = Array.Empty<object>()
                 };
 
@@ -257,7 +266,8 @@ namespace SharpTimer
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    Utils.LogError($"Failed to send message. Status code: {response.StatusCode}");
+                    string responseBody = await response.Content.ReadAsStringAsync();
+                    Utils.LogError($"Failed to send message. Status code: {response.StatusCode}. Body: {responseBody}");
                 }
             }
             catch (Exception ex)
