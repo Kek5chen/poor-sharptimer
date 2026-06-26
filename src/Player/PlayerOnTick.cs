@@ -28,6 +28,7 @@ namespace SharpTimer
             try
             {
                 int currentTick = Server.TickCount;
+                ReplayVisualEntityOnTick();
 
                 foreach (CCSPlayerController player in connectedPlayers.Values)
                 {
@@ -114,7 +115,7 @@ namespace SharpTimer
                         // remove jumping in startzone
                         if (!startzoneJumping && playerTimers[player.Slot].inStartzone)
                         {
-                            if((playerButtons & PlayerButtons.Jump) != 0 || playerTimer.MovementService!.OldJumpPressed)
+                            if((playerButtons & PlayerButtons.Jump) != 0)
                                 playerPawn.AbsVelocity.Z = 0f;
                         }
 
@@ -185,7 +186,7 @@ namespace SharpTimer
 
                         /* hud strafe sync % */
                         if (StrafeHudEnabled)
-                            OnSyncTick(player, playerButtons, playerPawn.EyeAngles!);
+                            OnSyncTick(player, playerButtons, playerPawn.V_angle!);
 
                         // reset in startzone
                         if (StrafeHudEnabled && playerTimer.inStartzone && playerTimer.Rotation.Count > 0) 
@@ -282,7 +283,6 @@ namespace SharpTimer
                             player.PrintToCenterHtml(hudContent);
                         
                         // idk what this is for
-                        playerTimer.MovementService!.OldJumpPressed = false;
                     }
                 }
             }
@@ -301,6 +301,23 @@ namespace SharpTimer
             Vector_t playerSpeed = player.PlayerPawn!.Value!.AbsVelocity.ToVector_t();
             bool keyEnabled = !playerTimer.HideKeys && !playerTimer.IsReplaying && keysOverlayEnabled;
             bool hudEnabled = !playerTimer.HideTimerHud && hudOverlayEnabled;
+            int replayTicks = playerReplays[player.Slot].CurrentPlaybackFrame;
+
+            if (playerTimer.IsReplaying && playerReplays.TryGetValue(player.Slot, out PlayerReplays? replayState) && replayState.CurrentReplayFrame != null)
+            {
+                if (replayState.CurrentReplayFrame.Speed != null)
+                {
+                    playerSpeed = new Vector_t(
+                        replayState.CurrentReplayFrame.Speed.X,
+                        replayState.CurrentReplayFrame.Speed.Y,
+                        replayState.CurrentReplayFrame.Speed.Z
+                    );
+                }
+
+                replayTicks = replayState.CurrentReplayFrame.TimerTicks > 0
+                    ? replayState.CurrentReplayFrame.TimerTicks
+                    : (int)Math.Round(replayState.CurrentReplayFrame.SampleTime * Math.Max(1, replayState.RecordingTickrate));
+            }
 
             string formattedPlayerVel = Math.Round(use2DSpeed
                 ? playerSpeed.Length2D()
@@ -340,7 +357,7 @@ namespace SharpTimer
                             $"<font color='gray' class='fontSize-s stratum-bold-italic'> {playerTimer.CurrentMapStage}/{stageTriggerCount}</font>" : "")} " +
                             $"<br>"
                         : playerTimer.IsReplaying
-                            ? $" <font class='horizontal-center' color='red'>◉ REPLAY {Utils.FormatTime(playerReplays[player.Slot].CurrentPlaybackFrame)}</font> " +
+                            ? $" <font class='horizontal-center' color='red'>◉ REPLAY {Utils.FormatTime(replayTicks)}</font> " +
                             $"<br>"
                             : "";
 
@@ -367,7 +384,7 @@ namespace SharpTimer
                                     $"{((playerButtons & PlayerButtons.Forward) != 0 ? "W" : "_")} " +
                                     $"{((playerButtons & PlayerButtons.Moveright) != 0 ? "D" : "_")} " +
                                     $"{((playerButtons & PlayerButtons.Back) != 0 ? "S" : "_")} " +
-                                    $"{((playerButtons & PlayerButtons.Jump) != 0 || playerTimer.MovementService!.OldJumpPressed ? "J" : "_")} " +
+                                    $"{((playerButtons & PlayerButtons.Jump) != 0 ? "J" : "_")} " +
                                     $"{((playerButtons & PlayerButtons.Duck) != 0 ? "C" : "_")}";
 
 
@@ -430,7 +447,9 @@ namespace SharpTimer
 
             try
             {
-                var target = specTargets[player.Pawn.Value!.ObserverServices!.ObserverTarget.Index];
+                if (!specTargets.TryGetValue(player.Pawn.Value!.ObserverServices!.ObserverTarget.Index, out var target))
+                    return;
+
                 if (playerTimers.TryGetValue(target.Slot, out PlayerTimerInfo? playerTimer) && IsAllowedPlayer(target))
                 {
                     string hudContent = GetHudContent(playerTimer, target);

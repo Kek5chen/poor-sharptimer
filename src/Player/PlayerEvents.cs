@@ -70,6 +70,7 @@ namespace SharpTimer
                         playerTime.SoundsEnabled = soundsEnabledByDefault;
 
                         SetNormalStyle(player);
+                        SetHidePlayersState(slot, false);
                     }
 
                     if (isForBot == false)
@@ -93,6 +94,12 @@ namespace SharpTimer
                     Utils.LogDebug($"Total playerTimers: {playerTimers.Count}");
                     Utils.LogDebug($"Total playerReplays: {playerReplays.Count}");
                     QueuePublishLiveTelemetry(force: true);
+
+                    if (!isForBot && enableReplays && enableSRreplayBot && replayBotController == null &&
+                        (replayBotVisualEntity == null || !replayBotVisualEntity.IsValid) && !replayBotSpawnPending)
+                    {
+                        AddTimer(2.0f, () => _ = Task.Run(SpawnReplayBot));
+                    }
                 }
                 finally
                 {
@@ -131,9 +138,13 @@ namespace SharpTimer
                     playerCheckpoints.Remove(player.Slot);
 
                     specTargets.Remove(player.Pawn.Value!.EntityHandle.Index);
+                    SetHidePlayersState(player.Slot, false);
 
                     if (enableReplays)
                     {
+                        if (playerReplays.TryGetValue(player.Slot, out var replayState))
+                            ClearDetachedReplayView(player, replayState);
+
                         //schizo removing data from memory
                         playerReplays[player.Slot] = new PlayerReplays();
                         playerReplays.Remove(player.Slot);
@@ -148,6 +159,12 @@ namespace SharpTimer
                     if (connectMsgEnabled == true && isForBot == false)
                     {
                         Utils.PrintToChatAll(Localizer["disconnect_message", connectedPlayer.PlayerName]);
+                    }
+
+                    if (replayBotController != null && replayBotController.Handle == player.Handle)
+                    {
+                        replayBotController = null;
+                        replayBotSpawnPending = false;
                     }
 
                     QueuePublishLiveTelemetry(force: true);

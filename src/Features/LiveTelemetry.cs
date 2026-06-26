@@ -23,6 +23,11 @@ namespace SharpTimer
         private bool liveTelemetryMissingSocketLogged;
         private long liveTelemetryLastPublishAt;
         private long liveTelemetryLastProgressRefreshAt;
+        private string? liveTelemetryQueuedPayload;
+        private readonly object liveTelemetryPublishSync = new();
+        private int liveTelemetryPublishWorkerActive;
+        private bool liveTelemetryProgressMetadataScanned;
+        private bool liveTelemetryProgressMetadataValid;
 
         private sealed class LiveSnapshot
         {
@@ -176,6 +181,11 @@ namespace SharpTimer
                 liveTelemetryRedis = null;
                 liveTelemetryDatabase = null;
                 liveTelemetrySubscriber = null;
+                lock (liveTelemetryPublishSync)
+                {
+                    liveTelemetryQueuedPayload = null;
+                }
+                System.Threading.Interlocked.Exchange(ref liveTelemetryPublishWorkerActive, 0);
             }
         }
 
@@ -196,14 +206,77 @@ namespace SharpTimer
                 if (!force && payload == liveTelemetryLastPayload)
                     return;
 
-                Utils.LogDebug($"Live telemetry queue force={force} bytes={payload.Length}");
                 liveTelemetryLastPayload = payload;
-                PublishLiveTelemetry(payload);
+                EnqueueLiveTelemetryPublish(payload);
             }
             catch (Exception ex)
             {
                 Utils.LogError($"Error queueing live telemetry: {ex.Message}");
             }
+        }
+
+        private void EnqueueLiveTelemetryPublish(string payload)
+        {
+            lock (liveTelemetryPublishSync)
+            {
+                liveTelemetryQueuedPayload = payload;
+            }
+
+            if (System.Threading.Interlocked.CompareExchange(ref liveTelemetryPublishWorkerActive, 1, 0) != 0)
+                return;
+
+            _ = Task.Run(ProcessLiveTelemetryPublishQueue);
+        }
+
+        private async Task ProcessLiveTelemetryPublishQueue()
+        {
+            try
+            {
+                while (true)
+                {
+                    string? payload;
+                    lock (liveTelemetryPublishSync)
+                    {
+                        payload = liveTelemetryQueuedPayload;
+                        liveTelemetryQueuedPayload = null;
+                    }
+
+                    if (string.IsNullOrEmpty(payload))
+                        return;
+
+                    PublishLiveTelemetry(payload);
+                    await Task.Yield();
+                }
+            }
+            finally
+            {
+                System.Threading.Interlocked.Exchange(ref liveTelemetryPublishWorkerActive, 0);
+
+                bool hasPendingPayload;
+                lock (liveTelemetryPublishSync)
+                {
+                    hasPendingPayload = !string.IsNullOrEmpty(liveTelemetryQueuedPayload);
+                }
+
+                if (hasPendingPayload && System.Threading.Interlocked.CompareExchange(ref liveTelemetryPublishWorkerActive, 1, 0) == 0)
+                    _ = Task.Run(ProcessLiveTelemetryPublishQueue);
+            }
+        }
+
+        private bool HasValidLiveTelemetryProgressMetadata()
+        {
+            if (!liveTelemetryProgressMetadataScanned)
+                return false;
+
+            bool hasStart = currentRespawnPos.HasValue && !IsZeroVector(currentRespawnPos.Value);
+            bool hasEnd = currentEndPos.HasValue && !IsZeroVector(currentEndPos.Value);
+            if (!hasStart || !hasEnd)
+                return false;
+
+            if (string.Equals(currentMapType, "Staged", StringComparison.OrdinalIgnoreCase))
+                return stageTriggerCount > 0;
+
+            return true;
         }
 
         private void RefreshLiveTelemetryProgressMetadata(bool force = false)
@@ -214,10 +287,7 @@ namespace SharpTimer
                 if (!force && now - liveTelemetryLastProgressRefreshAt < 5000)
                     return;
 
-                bool missingProgressData = stageTriggerCount == 0
-                    || (!currentRespawnPos.HasValue || IsZeroVector(currentRespawnPos.Value))
-                    || (!currentEndPos.HasValue || IsZeroVector(currentEndPos.Value));
-                if (!force && !missingProgressData)
+                if (!force && liveTelemetryProgressMetadataValid)
                     return;
 
                 liveTelemetryLastProgressRefreshAt = now;
@@ -235,7 +305,8 @@ namespace SharpTimer
 
                 FindStageTriggers();
                 FindCheckpointTriggers();
-                Utils.LogDebug($"Live telemetry refresh: stages={stageTriggerCount}, checkpoints={cpTriggerCount}, mapType={currentMapType ?? "null"}");
+                liveTelemetryProgressMetadataScanned = true;
+                liveTelemetryProgressMetadataValid = HasValidLiveTelemetryProgressMetadata();
             }
             catch (Exception ex)
             {
@@ -252,7 +323,6 @@ namespace SharpTimer
 
                 liveTelemetryDatabase.StringSet(LiveTelemetryKey, payload);
                 liveTelemetrySubscriber.Publish(RedisChannel.Literal(LiveTelemetryChannel), payload);
-                Utils.LogDebug("Live telemetry published");
             }
             catch (Exception ex)
             {

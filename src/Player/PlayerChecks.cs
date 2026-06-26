@@ -47,7 +47,7 @@ namespace SharpTimer
 
             bool isConnected = connectedPlayers.ContainsKey(player.Slot) && playerTimers.ContainsKey(player.Slot);
             bool isObservingValid = player.Pawn?.Value!.ObserverServices?.ObserverTarget != null &&
-                                    specTargets.ContainsKey(player.Pawn.Value.ObserverServices.ObserverTarget.Index);
+                                    player.Pawn.Value.ObserverServices.ObserverTarget.IsValid;
 
             return isConnected && isObservingValid;
         }

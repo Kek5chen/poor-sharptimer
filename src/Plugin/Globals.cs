@@ -50,6 +50,7 @@ namespace SharpTimer
         private int movementServices;
         private int movementPtr;
         private readonly CSPlayerState[] _oldPlayerState = new CSPlayerState[65];
+        private HashSet<int> activeHidePlayersSlots = [];
 
         public Dictionary<int, PlayerTimerInfo> playerTimers = [];
         private Dictionary<int, PlayerReplays> playerReplays = [];
@@ -143,8 +144,13 @@ namespace SharpTimer
         public bool enableReplays = false;
         public bool onlySRReplay = false;
         public bool enableSRreplayBot = false;
+        public bool replayBotSpawnPending = false;
         public CCSPlayerController? replayBotController;
+        public CBaseModelEntity? replayBotVisualEntity;
+        public PlayerReplays replayBotVisualReplay = new();
+        public List<CBaseEntity> replayBotFallbackSpawns = [];
         public string replayBotName = "";
+        public string replayBotVisualModel = "characters/models/ctm_fbi/ctm_fbi.vmdl";
         public int maxReplayFrames = 19200;
         public string apiKey = "";
 

@@ -1032,6 +1032,7 @@ namespace SharpTimer
                                     value.HideKeys = hideKeys;
                                     value.HideWeapon = hideWeapon;
                                     value.HidePlayers = hidePlayers;
+                                    SetHidePlayersState(slot, hidePlayers);
                                     value.SoundsEnabled = soundsEnabled;
                                     value.PlayerFov = playerFov;
                                     value.IsVip = isVip;
@@ -1177,6 +1178,12 @@ namespace SharpTimer
             {
                 if (player == null || !IsAllowedPlayer(player))
                     return;
+
+                if (timerTicks <= 0)
+                {
+                    Utils.LogDebug($"Skipping non-positive stage time for {playerName} on stage {stage}: {timerTicks}");
+                    return;
+                }
 
                 //if ((bonusX == 0 && !playerTimers[slot].IsTimerRunning) || (bonusX != 0 && !playerTimers[slot].IsBonusTimerRunning)) return;
                 string currentMapNamee = bonusX == 0 ? currentMapName! : $"{currentMapName}_bonus{bonusX}";

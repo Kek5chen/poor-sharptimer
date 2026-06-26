@@ -99,11 +99,6 @@ namespace SharpTimer
             if (IsTimerBlocked(player))
                 return;
 
-            if (ReplayCheck(player))
-                return;
-
-            Utils.PrintToChat(player, Localizer["available_replay_cmds"]);
-
             _ = Task.Run(async () => await ReplayHandler(player, slot, "1", "69", "unknown", 0, playerTimers[slot].currentStyle));
         }
 
@@ -306,16 +301,29 @@ namespace SharpTimer
                 return;
             }
 
+            if (playerTimers[slot].IsReplaying)
+            {
+                StopReplay(player);
+                return;
+            }
+
+            bool useInterpolatedPlayback = !wr;
+
             if (wr)
                 await ReadReplayFromGlobal(player, wrID, style, bonusX);
             else
-                await ReadReplayFromJson(player, !self ? srSteamID : pbSteamID, slot, bonusX, style);
+                await ReadReplayFromJson(player, !self ? srSteamID : pbSteamID, slot, bonusX, style, useInterpolatedPlayback);
 
             if (playerReplays[slot].replayFrames.Count == 0) return;
 
             if (!wr) await GetReplayVIPGif(!self ? srSteamID : pbSteamID, slot);
 
-            playerTimers[slot].IsReplaying = !playerTimers[slot].IsReplaying;
+            bool useDetachedReplayView = false;
+            playerReplays[slot].UseDetachedReplayView = useDetachedReplayView && StartDetachedReplayView(player, playerReplays[slot]);
+
+            playerTimers[slot].IsReplaying = true;
+            playerReplays[slot].UseInterpolatedPlayback = useInterpolatedPlayback;
+            playerReplays[slot].PlaybackTimeSeconds = 0;
 
             if (wr)
                 playerTimers[slot].ReplayHUDString = $"{wrPlayerName} | {wrTime}";
@@ -327,6 +335,7 @@ namespace SharpTimer
             playerTimers[slot].IsBonusTimerRunning = false;
             playerTimers[slot].BonusTimerTicks = 0;
             playerReplays[slot].CurrentPlaybackFrame = 0;
+            playerReplays[slot].PlaybackTimeSeconds = 0;
 
             if (stageTriggers.Count != 0) playerTimers[slot].StageTimes!.Clear(); //remove previous stage times if the map has stages
             if (stageTriggers.Count != 0) playerTimers[slot].StageVelos!.Clear(); //remove previous stage times if the map has stages
@@ -369,6 +378,9 @@ namespace SharpTimer
             {
                 Utils.PrintToChat(player, Localizer["ending_replay"]);
                 playerTimers[slot].IsReplaying = false;
+
+                if (playerReplays.TryGetValue(slot, out var replayState))
+                    ClearDetachedReplayView(player, replayState);
 
                 if (player.PlayerPawn.Value!.MoveType != MoveType_t.MOVETYPE_WALK || player.PlayerPawn.Value.ActualMoveType != MoveType_t.MOVETYPE_WALK) SetMoveType(player, MoveType_t.MOVETYPE_WALK);
                     playerReplays.Remove(slot);
@@ -904,7 +916,7 @@ namespace SharpTimer
                         }
                         else
                         {
-                            player.PlayerPawn.Value!.Teleport(bonusRespawnPoses[1]!, player.PlayerPawn.Value?.EyeAngles.ToQAngle_t());
+                            player.PlayerPawn.Value!.Teleport(bonusRespawnPoses[1]!, player.PlayerPawn.Value?.V_angle.ToQAngle_t());
                         }
                         Utils.LogDebug($"{player.PlayerName} css_rb {1} to {bonusRespawnPoses[1]}");
                     }
@@ -940,7 +952,7 @@ namespace SharpTimer
                     if (bonusRespawnAngs.TryGetValue(bonusX, out QAngle_t? bonusAng) && bonusAng != null)
                         player.PlayerPawn.Value!.Teleport(bonusRespawnPoses[bonusX]!, bonusRespawnAngs[bonusX]!, new Vector_t(0, 0, 0));
                     else
-                        player.PlayerPawn.Value!.Teleport(bonusRespawnPoses[bonusX]!, player.PlayerPawn.Value?.EyeAngles.ToQAngle_t(), new Vector_t(0, 0, 0));
+                        player.PlayerPawn.Value!.Teleport(bonusRespawnPoses[bonusX]!, player.PlayerPawn.Value?.V_angle.ToQAngle_t(), new Vector_t(0, 0, 0));
 
                     Utils.LogDebug($"{player.PlayerName} css_rb {bonusX} to {bonusRespawnPoses[bonusX]}");
                 }
@@ -990,7 +1002,7 @@ namespace SharpTimer
 
             // Get the player's current position and rotation
             Vector_t currentPosition = player.Pawn.Value!.CBodyComponent?.SceneNode?.AbsOrigin.ToVector_t() ?? new Vector_t(0, 0, 0);
-            QAngle_t currentRotation = player.PlayerPawn.Value!.EyeAngles.ToQAngle_t();
+            QAngle_t currentRotation = player.PlayerPawn.Value!.V_angle.ToQAngle_t();
 
             if (useTriggers == true)
             {
@@ -1071,7 +1083,7 @@ namespace SharpTimer
 
                 if (stageTriggerPoses.TryGetValue(stageX, out Vector_t? stagePos) && stagePos != null)
                 {
-                    player.PlayerPawn.Value!.Teleport(stagePos, stageTriggerAngs[stageX] ?? player.PlayerPawn.Value?.EyeAngles.ToQAngle_t(), new Vector_t(0, 0, 0));
+                    player.PlayerPawn.Value!.Teleport(stagePos, stageTriggerAngs[stageX] ?? player.PlayerPawn.Value?.V_angle.ToQAngle_t(), new Vector_t(0, 0, 0));
                     Utils.LogDebug($"{player.PlayerName} css_stage {stageX} to {stagePos}");
                 }
                 else
@@ -1113,25 +1125,8 @@ namespace SharpTimer
 
             if (playerTimers[slot].IsReplaying)
             {
-                Utils.PrintToChat(player, Localizer["ending_replay"]);
-                playerTimers[slot].IsReplaying = false;
-
-                if (player.PlayerPawn.Value!.MoveType != MoveType_t.MOVETYPE_WALK || player.PlayerPawn.Value.ActualMoveType == MoveType_t.MOVETYPE_WALK) SetMoveType(player, MoveType_t.MOVETYPE_WALK);
-                    playerReplays.Remove(slot);
-
-                playerReplays[slot] = new PlayerReplays();
-                playerTimers[slot].IsTimerBlocked = false;
-                playerTimers[slot].IsTimerRunning = false;
-                playerTimers[slot].TimerTicks = 0;
-                playerTimers[slot].StageTicks = 0;
-                playerTimers[slot].IsBonusTimerRunning = false;
-                playerTimers[slot].BonusTimerTicks = 0;
-                playerReplays[slot].CurrentPlaybackFrame = 0;
-
-                if (stageTriggers.Count != 0) playerTimers[slot].StageTimes!.Clear(); //remove previous stage times if the map has stages
-                if (stageTriggers.Count != 0) playerTimers[slot].StageVelos!.Clear(); //remove previous stage times if the map has stages
-
-                RespawnPlayer(player);
+                StopReplay(player);
+                return;
             }
 
             else RespawnPlayer(player);
@@ -1408,7 +1403,7 @@ namespace SharpTimer
                         if (currentRespawnAng != null)
                             player.PlayerPawn.Value!.Teleport(currentRespawnPos, currentRespawnAng);
                         else
-                            player.PlayerPawn.Value!.Teleport(currentRespawnPos, player.PlayerPawn.Value?.EyeAngles.ToQAngle_t());
+                            player.PlayerPawn.Value!.Teleport(currentRespawnPos, player.PlayerPawn.Value?.V_angle.ToQAngle_t());
 
                         Utils.LogDebug($"{player.PlayerName} css_r to {currentRespawnPos}");
                     }
@@ -1423,7 +1418,7 @@ namespace SharpTimer
                 else
                 {
                     if (currentEndPos != null)
-                        player.PlayerPawn.Value!.Teleport(currentEndPos, player.PlayerPawn.Value?.EyeAngles.ToQAngle_t(), new Vector_t(0, 0, 0));
+                        player.PlayerPawn.Value!.Teleport(currentEndPos, player.PlayerPawn.Value?.V_angle.ToQAngle_t(), new Vector_t(0, 0, 0));
                     else
                         Utils.PrintToChat(player, Localizer["no_endpos"]);
                 }
@@ -1484,7 +1479,7 @@ namespace SharpTimer
             {
                 if (stageTriggerPoses.TryGetValue(currStage, out Vector_t? stagePos) && stagePos != null)
                 {
-                    player.PlayerPawn.Value!.Teleport(stagePos, stageTriggerAngs[currStage] ?? player.PlayerPawn.Value?.EyeAngles.ToQAngle_t(), new Vector_t(0, 0, 0));
+                    player.PlayerPawn.Value!.Teleport(stagePos, stageTriggerAngs[currStage] ?? player.PlayerPawn.Value?.V_angle.ToQAngle_t(), new Vector_t(0, 0, 0));
 
                     Utils.LogDebug($"{playerName} css_rs");
                 }
@@ -1605,6 +1600,7 @@ namespace SharpTimer
             bool hidingPlayers = !playerTimers[slot].HidePlayers;
 
             playerTimers[slot].HidePlayers = hidingPlayers;
+            SetHidePlayersState(slot, hidingPlayers);
             
             _ = Task.Run(async () => await SetPlayerStats(player, steamID, playerName, slot));
             
@@ -1708,7 +1704,7 @@ namespace SharpTimer
                 if (player != null && IsAllowedPlayer(foundPlayer) && playerTimers[slot].IsTimerBlocked)
                 {
                     player.PlayerPawn.Value!.Teleport(foundPlayer.Pawn.Value!.CBodyComponent?.SceneNode?.AbsOrigin.ToVector_t(),
-                        foundPlayer.PlayerPawn.Value!.EyeAngles.ToQAngle_t(), new Vector_t(0, 0, 0));
+                        foundPlayer.PlayerPawn.Value!.V_angle.ToQAngle_t(), new Vector_t(0, 0, 0));
 
                     Utils.LogDebug($"{player.PlayerName} css_goto to {foundPlayer.Pawn.Value.CBodyComponent?.SceneNode?.AbsOrigin.ToVector_t()}");
                 }
@@ -1754,7 +1750,7 @@ namespace SharpTimer
             // Get the player's current position and rotation
             Vector_t? currentPosition = player.Pawn.Value.CBodyComponent?.SceneNode?.AbsOrigin.ToVector_t();
             Vector_t currentSpeed = player.PlayerPawn.Value!.AbsVelocity.ToVector_t();
-            QAngle_t currentRotation = player.PlayerPawn.Value.EyeAngles.ToQAngle_t();
+            QAngle_t currentRotation = player.PlayerPawn.Value.V_angle.ToQAngle_t();
 
             // Convert position and rotation to strings
             string positionString = $"{currentPosition.GetValueOrDefault().X} {currentPosition.GetValueOrDefault().Y} {currentPosition.GetValueOrDefault().Z}";

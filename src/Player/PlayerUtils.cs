@@ -661,7 +661,7 @@ namespace SharpTimer
 
                 Utils.PrintToChatAll(Localizer["timer_time", newTime, timeDifference]);
                 if (enableStyles) Utils.PrintToChatAll(Localizer["timer_style", GetNamedStyle(style)]);
-                if (enableReplays == true && enableSRreplayBot == true && newSR && (oldticks > newticks || oldticks == 0))
+                if (enableReplays == true && enableSRreplayBot == true && newSR && (oldticks > newticks || oldticks == 0) && !replayBotSpawnPending)
                     _ = Task.Run(async () => await SpawnReplayBot());
                 
                 try

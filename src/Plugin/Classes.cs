@@ -262,15 +262,34 @@ namespace SharpTimer
         public int CurrentPlaybackFrame { get; set; }
         public int BonusX { get; set; }
         public int Style { get; set; }
+        public int RecordingTickrate { get; set; } = 64;
+        public double PlaybackTimeSeconds { get; set; }
+        public bool UseInterpolatedPlayback { get; set; }
+        [JsonIgnore]
+        public bool UseDetachedReplayView { get; set; }
+        [JsonIgnore]
+        public ReplayVector? LastTrailPosition { get; set; }
+        [JsonIgnore]
+        public long LastTrailEmitAtMilliseconds { get; set; }
+        [JsonIgnore]
+        public CBaseEntity? ReplayCamera { get; set; }
+        [JsonIgnore]
+        public ReplayFrames? CurrentReplayFrame { get; set; }
         public List<ReplayFrames> replayFrames { get; set; } = [];
         public class ReplayFrames
         {
+            public int SampleIndex { get; set; }
+            public double SampleTime { get; set; }
             public ReplayVector? Position { get; set; }
             public ReplayQAngle? Rotation { get; set; }
             public ReplayVector? Speed { get; set; }
             public PlayerButtons? Buttons { get; set; }
             public uint Flags { get; set; }
             public MoveType_t MoveType { get; set; }
+            public float DuckAmount { get; set; }
+            public bool Grounded { get; set; }
+            public int TimerTicks { get; set; }
+            public bool TeleportCut { get; set; }
         }
     }
 
@@ -278,6 +297,17 @@ namespace SharpTimer
     {
         public int Index { get; set; }
         public PlayerReplays.ReplayFrames? Frame { get; set; }
+    }
+
+    public class ReplayFileV2
+    {
+        public int Version { get; set; } = 2;
+        public string MapName { get; set; } = string.Empty;
+        public int BonusX { get; set; }
+        public int Style { get; set; }
+        public int Tickrate { get; set; } = 64;
+        public int TotalFrames { get; set; }
+        public List<PlayerReplays.ReplayFrames> Frames { get; set; } = [];
     }
 
     public class ReplayVector

@@ -49,6 +49,12 @@ public partial class SharpTimer
                 stageTriggers.Clear();
                 stageTriggerAngs.Clear();
                 stageTriggerPoses.Clear();
+                ClearReplayBotFallbackSpawns();
+                ClearReplayBotVisualEntity();
+                replayBotController = null;
+                replayBotSpawnPending = false;
+                liveTelemetryProgressMetadataScanned = false;
+                liveTelemetryProgressMetadataValid = false;
 
                 Utils.KillServerCommandEnts();
                 globalDisabled = false;
@@ -235,7 +241,8 @@ public partial class SharpTimer
             if (adServerRecordEnabled == true) ADtimerServerRecord();
             if (adMessagesEnabled == true) ADtimerMessages();
 
-            if (Utils.PlayersCount() > 0 && enableReplays && enableSRreplayBot && replayBotController == null)
+            if (enableReplays && enableSRreplayBot && replayBotController == null &&
+                (replayBotVisualEntity == null || !replayBotVisualEntity.IsValid) && !replayBotSpawnPending)
                 Server.NextFrame(() => _ = Task.Run(SpawnReplayBot));
 
             _ = Task.Run(Utils.GetMapInfo);
@@ -577,6 +584,8 @@ public partial class SharpTimer
         stageTriggers.Clear();
         stageTriggerAngs.Clear();
         stageTriggerPoses.Clear();
+        ClearReplayBotFallbackSpawns();
+        ClearReplayBotVisualEntity();
 
         stageTriggerCount = 0;
         useStageTriggers = false;
@@ -609,6 +618,8 @@ public partial class SharpTimer
 
         currentMapTier = null; //making sure previous map tier and type are wiped
         currentMapType = null;
+        liveTelemetryProgressMetadataScanned = false;
+        liveTelemetryProgressMetadataValid = false;
         currentMapOverrideDisableTelehop = []; //making sure previous map overrides are reset
         currentMapOverrideMaxSpeedLimit = [];
         currentMapOverrideStageRequirement = false;
