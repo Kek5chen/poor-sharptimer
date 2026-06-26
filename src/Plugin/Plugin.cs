@@ -82,15 +82,18 @@ public partial class SharpTimer
                     }
                     else
                     {
-                        Utils.LogDebug($"No db set, defaulting to SQLite");
+                        Utils.LogDebug($"No db set; using JSON persistence only");
                         dbPath = Path.Join(gameDir + "/csgo/cfg", "SharpTimer/database.db");
                         dbType = DatabaseType.SQLite;
-                        enableDb = true;
+                        enableDb = false;
                     }
-                    using (var connection = OpenConnection())
+                    if (enableDb)
                     {
-                        _ = CheckTablesAsync();
-                        ExecuteMigrations(connection);
+                        using (var connection = OpenConnection())
+                        {
+                            _ = CheckTablesAsync();
+                            ExecuteMigrations(connection);
+                        }
                     }
                     sqlCheck = true;
                 }
