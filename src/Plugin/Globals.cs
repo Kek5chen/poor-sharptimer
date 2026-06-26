@@ -92,6 +92,7 @@ namespace SharpTimer
         public Vector_t? currentEndPos;
 
         private Dictionary<nint, int> cpTriggers = [];
+        private Dictionary<int, Vector_t?> cpTriggerPoses = [];
         public int cpTriggerCount;
         private bool useCheckpointTriggers = false;
         public bool useCheckpointVerification = true;

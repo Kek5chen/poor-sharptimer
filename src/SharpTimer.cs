@@ -103,6 +103,8 @@ public partial class SharpTimer : BasePlugin
 
         HookEntityOutput("trigger_teleport", "OnStartTouch", TriggerTeleport_OnStartTouch, HookMode.Pre);
         HookEntityOutput("trigger_teleport", "OnEndTouch", TriggerTeleport_OnEndTouch, HookMode.Pre);
+
+        InitializeLiveTelemetry();
     }
 
     public override void Unload(bool hotReload)
@@ -148,6 +150,8 @@ public partial class SharpTimer : BasePlugin
 
         UnhookEntityOutput("trigger_teleport", "OnStartTouch", TriggerTeleport_OnStartTouch, HookMode.Pre);
         UnhookEntityOutput("trigger_teleport", "OnEndTouch", TriggerTeleport_OnEndTouch, HookMode.Pre);
+
+        DisposeLiveTelemetry();
     }
 
     private HookResult OnRunCommand(DynamicHook h)
@@ -362,6 +366,7 @@ public partial class SharpTimer : BasePlugin
 
         ClearMapData();
         LoadMapData(Server.MapName);
+        QueuePublishLiveTelemetry(force: true);
         return HookResult.Continue;
     }
 

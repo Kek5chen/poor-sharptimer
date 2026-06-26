@@ -92,6 +92,7 @@ namespace SharpTimer
                     Utils.LogDebug($"Total players connected: {connectedPlayers.Count}");
                     Utils.LogDebug($"Total playerTimers: {playerTimers.Count}");
                     Utils.LogDebug($"Total playerReplays: {playerReplays.Count}");
+                    QueuePublishLiveTelemetry(force: true);
                 }
                 finally
                 {
@@ -148,6 +149,8 @@ namespace SharpTimer
                     {
                         Utils.PrintToChatAll(Localizer["disconnect_message", connectedPlayer.PlayerName]);
                     }
+
+                    QueuePublishLiveTelemetry(force: true);
                 }
             }
             catch (Exception ex)

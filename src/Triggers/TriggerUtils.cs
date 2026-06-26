@@ -431,6 +431,7 @@ namespace SharpTimer
         private void FindCheckpointTriggers()
         {
             cpTriggers.Clear();
+            cpTriggerPoses.Clear();
             cpTriggerCount = 0;
 
             foreach (var trigger in entityCache.Triggers)
@@ -442,8 +443,13 @@ namespace SharpTimer
                 if (validCp)
                 {
                     cpTriggerCount++;
+                    if (trigger.CBodyComponent?.SceneNode?.AbsOrigin != null)
+                    {
+                        cpTriggerPoses[X] = trigger.CBodyComponent.SceneNode.AbsOrigin.ToVector_t();
+                    }
                     cpTriggers[trigger.Handle] = X;
                     Utils.LogDebug($"Added Checkpoint {cpTriggerCount} Trigger {trigger.Handle}");
+                    Utils.LogDebug($"Added Checkpoint {X} Pos {cpTriggerPoses.GetValueOrDefault(X)}");
                 }
             }
 

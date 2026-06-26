@@ -14,6 +14,8 @@ public partial class SharpTimer
         {
             Server.NextFrame(() =>
             {
+                currentMapName = mapName;
+                currentAddonID = GetAddonID();
                 Utils.LogDebug("OnMapStart:");
                 Utils.LogDebug("Executing SharpTimer/config");
                 Server.ExecuteCommand("sv_autoexec_mapname_cfg 0");
@@ -104,6 +106,10 @@ public partial class SharpTimer
 
                 _ = Task.Run(async () => await CacheGlobalPoints());
                 AddTimer(globalCacheInterval, async () => await CacheGlobalPoints(), TimerFlags.REPEAT | TimerFlags.STOP_ON_MAPCHANGE);
+
+                QueuePublishLiveTelemetry(force: true);
+                AddTimer(2.0f, () => RefreshLiveTelemetryProgressMetadata(force: true), TimerFlags.STOP_ON_MAPCHANGE);
+                AddTimer(0.25f, () => QueuePublishLiveTelemetry(), TimerFlags.REPEAT | TimerFlags.STOP_ON_MAPCHANGE);
             });
         }
         catch (Exception ex)
