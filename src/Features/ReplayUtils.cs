@@ -1170,7 +1170,10 @@ namespace SharpTimer
             OnPlayerConnect(bot, true);
             ChangePlayerName(bot, replayBotName);
             playerTimers[bot.Slot].IsTimerBlocked = true;
-            _ = Task.Run(async () => await ReplayHandler(bot, bot.Slot));
+            // SR replay bot: load the #1 record for the default style/mode. Without the
+            // explicit mode the call defaulted to mode="" and read the wrong path, so the
+            // bot loaded no frames and just ran default AI ("walked forward").
+            _ = Task.Run(async () => await ReplayHandler(bot, bot.Slot, "1", "69", "unknown", 0, 0, false, GetModeName(defaultMode)));
             replayBotSpawnPending = false;
             Utils.LogDebug($"Starting replay for {bot.PlayerName}");
 
