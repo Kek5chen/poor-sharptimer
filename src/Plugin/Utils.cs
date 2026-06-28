@@ -278,7 +278,9 @@ namespace SharpTimer
             }
             else
             {
-                LogError("Invalid hex color code format. Please check SharpTimer/config.cfg");
+                // Non-hex inputs (named colors not in the symbol map, ReplaceVars tokens like
+                // {default}) legitimately reach here and fall back; don't spam ERROR for them.
+                LogDebug("Non-hex color token, falling back (check SharpTimer/config.cfg if unexpected)");
             }
 
             return false;

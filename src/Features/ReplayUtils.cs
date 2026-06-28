@@ -436,9 +436,9 @@ namespace SharpTimer
         private async Task<PlayerReplays?> LoadReplayStateFromJson(string steamId, int bonusX = 0, int style = 0, string mode = "", bool useInterpolatedPlayback = false)
         {
             string fileName = $"{steamId}_replay.json";
-            string playerReplaysPath;
-            if (style != 0) playerReplaysPath = Path.Join(gameDir, "csgo", "cfg", "SharpTimer", "PlayerReplayData", bonusX == 0 ? currentMapName : $"{currentMapName}_bonus{bonusX}", GetNamedStyle(style), mode, fileName);
-            else playerReplaysPath = Path.Join(gameDir, "csgo", "cfg", "SharpTimer", "PlayerReplayData", bonusX == 0 ? currentMapName : $"{currentMapName}_bonus{bonusX}", mode, fileName);
+            // Path must match DumpReplayToJson's writer exactly: <map>/GetNamedStyle(style)/mode/file
+            // (GetNamedStyle(0) == "Normal", so it is NOT optional even for the default style).
+            string playerReplaysPath = Path.Join(gameDir, "csgo", "cfg", "SharpTimer", "PlayerReplayData", bonusX == 0 ? currentMapName : $"{currentMapName}_bonus{bonusX}", GetNamedStyle(style), mode, fileName);
 
             if (!File.Exists(playerReplaysPath))
             {
